@@ -38,7 +38,7 @@ Sent from ThompsonShell Portfolio
                 subject,
                 message,
                 settings.DEFAULT_FROM_EMAIL,
-                [getattr(settings, "ADMIN_NOTIFICATION_EMAIL", "asilbek.rajabov.offcial@gmail.com")],
+                [settings.ADMIN_NOTIFICATION_EMAIL],
                 fail_silently=True,
             )
         except Exception:
