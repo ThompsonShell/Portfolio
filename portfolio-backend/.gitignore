@@ -8,4 +8,4 @@ media/
 dist/
 build/
 .eggs/
-d
+venv/
