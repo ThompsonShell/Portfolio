@@ -10,7 +10,7 @@ class LectureSerializer(serializers.ModelSerializer):
     class Meta:
         model = Lecture
         fields = [
-            "id", "title", "description", "youtube_video_id", "category",
+            "id", "title", "description", "youtube_video_id", "lecture_video", "category",
             "duration_seconds", "thumbnail_url", "order", "created_at",
             "prev_id", "next_id"
         ]
@@ -29,3 +29,12 @@ class LectureSerializer(serializers.ModelSerializer):
             category=obj.category
         ).filter(order__gte=obj.order).exclude(id=obj.id).order_by("order", "id").first()
         return nxt.id if nxt else None
+
+    def validate(self, attrs):
+        youtube_video_id = attrs.get("youtube_video_id", getattr(self.instance, "youtube_video_id", None))
+        lecture_video = attrs.get("lecture_video", getattr(self.instance, "lecture_video", None))
+        if not youtube_video_id and not lecture_video:
+            raise serializers.ValidationError(
+                "Either youtube_video_id or lecture_video must be provided."
+            )
+        return attrs

@@ -1,13 +1,17 @@
 from rest_framework import viewsets
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAdminUser
 from django.db.models import Q
 from .models import Lecture
 from .serializers import LectureSerializer
 
 
-class LectureViewSet(viewsets.ReadOnlyModelViewSet):
+class LectureViewSet(viewsets.ModelViewSet):
     serializer_class = LectureSerializer
-    permission_classes = [AllowAny]
+
+    def get_permissions(self):
+        if self.action in ("list", "retrieve"):
+            return [AllowAny()]
+        return [IsAdminUser()]
 
     def get_queryset(self):
         qs = Lecture.objects.all()

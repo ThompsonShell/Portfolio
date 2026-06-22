@@ -189,7 +189,7 @@ export default function AboutPage() {
               {[
                 { label: "Experience", val: "2 years" },
                 { label: "Projects", val: "7+" },
-                { label: "Lectures", val: "4" },
+                { label: "Lectures", val: "1" },
               ].map((stat) => (
                 <div key={stat.label} className="flex items-center justify-between px-8 py-6 rounded-3xl bg-white/[0.04] border border-white/10 shadow-2xl">
                   <span className="text-accent-primary text-xs font-bold uppercase tracking-[0.2em]">{stat.label}</span>

@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -13,7 +14,8 @@ class Lecture(models.Model):
     ]
 
     title = models.CharField(max_length=300)
-    youtube_video_id = models.CharField(max_length=20, help_text="YouTube video ID (e.g. dQw4w9WgXcQ)")
+    youtube_video_id = models.CharField(max_length=20, help_text="YouTube video ID (e.g. dQw4w9WgXcQ)", blank=True, null=True)
+    lecture_video = models.FileField(upload_to="lectures/videos/", blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     category = models.CharField(max_length=30, choices=CATEGORY_CHOICES, default="general")
     duration_seconds = models.PositiveIntegerField(default=0, help_text="Video duration in seconds")
@@ -25,3 +27,8 @@ class Lecture(models.Model):
 
     def __str__(self) -> str:
         return self.title
+
+    def clean(self):
+        super().clean()
+        if not self.youtube_video_id and not self.lecture_video:
+            raise ValidationError("Either youtube_video_id or lecture_video must be provided.")

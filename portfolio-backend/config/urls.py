@@ -11,6 +11,7 @@ urlpatterns = [
     path("api/", include("lectures.urls")),
     path("api/", include("about.urls")),
     path("api/", include("coffee.urls")),
+    path("api-auth/", include("rest_framework.urls")),
 ]
 
 if settings.DEBUG:
