@@ -5,8 +5,18 @@ import { useRef, useState, useEffect, useCallback } from "react";
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
 interface VideoPlayerProps {
-    videoId: string;
+    youtubeId?: string | null;
+    videoUrl?: string | null;
     duration?: string;
+}
+
+interface PlayerControls {
+    play: () => void;
+    pause: () => void;
+    seekTo: (seconds: number) => void;
+    getCurrentTime: () => number;
+    getDuration: () => number;
+    setPlaybackRate: (rate: number) => void;
 }
 
 declare global {
@@ -16,9 +26,13 @@ declare global {
     }
 }
 
-export default function VideoPlayer({ videoId, duration = "12:30" }: VideoPlayerProps) {
+export default function VideoPlayer({ youtubeId, videoUrl, duration = "12:30" }: VideoPlayerProps) {
+    const isNative = !youtubeId && !!videoUrl;
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const playerRef = useRef<any>(null);
+    const ytPlayerRef = useRef<any>(null);
+    const videoElRef = useRef<HTMLVideoElement>(null);
+    const controlsRef = useRef<PlayerControls | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const progressRef = useRef<HTMLDivElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -29,15 +43,18 @@ export default function VideoPlayer({ videoId, duration = "12:30" }: VideoPlayer
     const [progress, setProgress] = useState(0);
     const [isSeeking, setIsSeeking] = useState(false);
     const [ccEnabled, setCcEnabled] = useState(false);
-    const playerContainerId = `yt-player-${videoId}`;
+    const playerContainerId = `yt-player-${youtubeId || "native"}`;
 
+    // YouTube player setup
     useEffect(() => {
+        if (isNative) return;
+
         function initPlayer() {
             if (!window.YT || !window.YT.Player) return;
-            playerRef.current = new window.YT.Player(playerContainerId, {
+            ytPlayerRef.current = new window.YT.Player(playerContainerId, {
                 height: "100%",
                 width: "100%",
-                videoId,
+                videoId: youtubeId,
                 playerVars: {
                     controls: 0,
                     modestbranding: 1,
@@ -49,13 +66,21 @@ export default function VideoPlayer({ videoId, duration = "12:30" }: VideoPlayer
                 },
                 events: {
                     onReady: () => {
+                        controlsRef.current = {
+                            play: () => ytPlayerRef.current?.playVideo(),
+                            pause: () => ytPlayerRef.current?.pauseVideo(),
+                            seekTo: (t: number) => ytPlayerRef.current?.seekTo(t, true),
+                            getCurrentTime: () => ytPlayerRef.current?.getCurrentTime?.() || 0,
+                            getDuration: () => ytPlayerRef.current?.getDuration?.() || 0,
+                            setPlaybackRate: (r: number) => ytPlayerRef.current?.setPlaybackRate(r),
+                        };
                         setPlayerReady(true);
-                        const dur = playerRef.current?.getDuration?.() || 0;
+                        const dur = ytPlayerRef.current?.getDuration?.() || 0;
                         if (dur > 0) setTotalDuration(dur);
                     },
                     onStateChange: (e: any) => {
                         setIsPlaying(e.data === window.YT.PlayerState.PLAYING);
-                        const dur = playerRef.current?.getDuration?.() || 0;
+                        const dur = ytPlayerRef.current?.getDuration?.() || 0;
                         if (dur > 0) setTotalDuration(dur);
                     },
                 },
@@ -72,18 +97,51 @@ export default function VideoPlayer({ videoId, duration = "12:30" }: VideoPlayer
         }
 
         return () => {
-            playerRef.current?.destroy();
+            ytPlayerRef.current?.destroy();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [videoId]);
+    }, [youtubeId, isNative]);
+
+    // Native <video> player setup
+    useEffect(() => {
+        if (!isNative) return;
+        const el = videoElRef.current;
+        if (!el) return;
+
+        controlsRef.current = {
+            play: () => el.play(),
+            pause: () => el.pause(),
+            seekTo: (t: number) => { el.currentTime = t; },
+            getCurrentTime: () => el.currentTime || 0,
+            getDuration: () => el.duration || 0,
+            setPlaybackRate: (r: number) => { el.playbackRate = r; },
+        };
+
+        const onLoaded = () => {
+            setPlayerReady(true);
+            if (el.duration) setTotalDuration(el.duration);
+        };
+        const onPlay = () => setIsPlaying(true);
+        const onPause = () => setIsPlaying(false);
+
+        el.addEventListener("loadedmetadata", onLoaded);
+        el.addEventListener("play", onPlay);
+        el.addEventListener("pause", onPause);
+
+        return () => {
+            el.removeEventListener("loadedmetadata", onLoaded);
+            el.removeEventListener("play", onPlay);
+            el.removeEventListener("pause", onPause);
+        };
+    }, [videoUrl, isNative]);
 
     // Poll current time
     useEffect(() => {
         if (!playerReady) return;
         const interval = setInterval(() => {
-            if (playerRef.current && !isSeeking) {
-                const ct = playerRef.current.getCurrentTime?.() || 0;
-                const dur = playerRef.current.getDuration?.() || 0;
+            if (controlsRef.current && !isSeeking) {
+                const ct = controlsRef.current.getCurrentTime();
+                const dur = controlsRef.current.getDuration();
                 setCurrentTime(ct);
                 if (dur > 0) {
                     setTotalDuration(dur);
@@ -101,43 +159,43 @@ export default function VideoPlayer({ videoId, duration = "12:30" }: VideoPlayer
     };
 
     const togglePlay = () => {
-        if (!playerReady || !playerRef.current) return;
-        if (isPlaying) playerRef.current.pauseVideo();
-        else playerRef.current.playVideo();
+        if (!playerReady || !controlsRef.current) return;
+        if (isPlaying) controlsRef.current.pause();
+        else controlsRef.current.play();
     };
 
     const rewind = () => {
-        if (!playerReady || !playerRef.current) return;
-        const ct = playerRef.current.getCurrentTime();
-        playerRef.current.seekTo(Math.max(ct - 10, 0), true);
+        if (!playerReady || !controlsRef.current) return;
+        const ct = controlsRef.current.getCurrentTime();
+        controlsRef.current.seekTo(Math.max(ct - 10, 0));
     };
 
     const forward = () => {
-        if (!playerReady || !playerRef.current) return;
-        const ct = playerRef.current.getCurrentTime();
-        playerRef.current.seekTo(ct + 10, true);
+        if (!playerReady || !controlsRef.current) return;
+        const ct = controlsRef.current.getCurrentTime();
+        controlsRef.current.seekTo(ct + 10);
     };
 
     const changeSpeed = () => {
         const nextIdx = (speedIdx + 1) % SPEEDS.length;
         setSpeedIdx(nextIdx);
-        if (playerReady && playerRef.current) {
-            playerRef.current.setPlaybackRate(SPEEDS[nextIdx]);
+        if (playerReady && controlsRef.current) {
+            controlsRef.current.setPlaybackRate(SPEEDS[nextIdx]);
         }
     };
 
     const handleSeek = useCallback((clientX: number) => {
-        if (!progressRef.current || !playerRef.current) return;
-        const dur = playerRef.current.getDuration?.() || 0;
+        if (!progressRef.current || !controlsRef.current) return;
+        const dur = controlsRef.current.getDuration();
         if (!dur) return;
 
         const rect = progressRef.current.getBoundingClientRect();
         const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
         const seekTime = ratio * dur;
-        
+
         setProgress(ratio * 100);
         setCurrentTime(seekTime);
-        playerRef.current.seekTo(seekTime, true);
+        controlsRef.current.seekTo(seekTime);
     }, []);
 
     const handleProgressClick = (e: React.MouseEvent) => {
@@ -167,21 +225,21 @@ export default function VideoPlayer({ videoId, duration = "12:30" }: VideoPlayer
     };
 
     const toggleCC = () => {
-        if (!playerRef.current) return;
+        if (isNative || !ytPlayerRef.current) return;
         try {
             if (ccEnabled) {
-                playerRef.current.unloadModule("captions");
+                ytPlayerRef.current.unloadModule("captions");
                 setCcEnabled(false);
             } else {
-                playerRef.current.loadModule("captions");
+                ytPlayerRef.current.loadModule("captions");
                 // Give module time to load, then set language
                 setTimeout(() => {
                     try {
-                        playerRef.current?.setOption?.("captions", "track", { languageCode: "uz" });
+                        ytPlayerRef.current?.setOption?.("captions", "track", { languageCode: "uz" });
                     } catch {
                         // If uz not available, try auto-generated
                         try {
-                            playerRef.current?.setOption?.("captions", "track", { languageCode: "" });
+                            ytPlayerRef.current?.setOption?.("captions", "track", { languageCode: "" });
                         } catch { /* ignore */ }
                     }
                 }, 300);
@@ -196,7 +254,17 @@ export default function VideoPlayer({ videoId, duration = "12:30" }: VideoPlayer
         <div ref={containerRef} className="flex flex-col gap-0">
             {/* Video Container */}
             <div className="relative aspect-video rounded-t-[2rem] overflow-hidden bg-black border border-white/5 border-b-0 shadow-2xl group">
-                <div id={playerContainerId} className="w-full h-full" />
+                {isNative ? (
+                    <video
+                        ref={videoElRef}
+                        src={videoUrl || undefined}
+                        className="w-full h-full object-contain"
+                        playsInline
+                        onClick={togglePlay}
+                    />
+                ) : (
+                    <div id={playerContainerId} className="w-full h-full" />
+                )}
 
                 {!isPlaying && (
                     <div
@@ -268,10 +336,12 @@ export default function VideoPlayer({ videoId, duration = "12:30" }: VideoPlayer
                         {SPEEDS[speedIdx]}x
                     </button>
 
-                    <button onClick={toggleCC} title="Subtitles"
-                        className={`px-4 py-2 rounded-xl text-[11px] font-bold hover:bg-white/10 transition-colors border ${ccEnabled ? 'bg-white/15 text-white border-white/20' : 'bg-white/5 text-white/60 hover:text-white border-white/5'}`}>
-                        CC
-                    </button>
+                    {!isNative && (
+                        <button onClick={toggleCC} title="Subtitles"
+                            className={`px-4 py-2 rounded-xl text-[11px] font-bold hover:bg-white/10 transition-colors border ${ccEnabled ? 'bg-white/15 text-white border-white/20' : 'bg-white/5 text-white/60 hover:text-white border-white/5'}`}>
+                            CC
+                        </button>
+                    )}
 
                     <button onClick={toggleFullscreen} title="Fullscreen"
                         className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white hover:bg-white/10 transition-colors border border-white/5">

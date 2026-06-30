@@ -39,10 +39,11 @@ export interface Lecture {
   id: number;
   title: string;
   description: string;
-  youtube_video_id: string;
+  youtube_video_id: string | null;
+  lecture_video: string | null;
   category: string;
   duration_seconds: number;
-  thumbnail_url: string;
+  thumbnail_url: string | null;
   order: number;
   created_at: string;
 }

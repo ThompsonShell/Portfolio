@@ -81,7 +81,8 @@ export default function LectureDetailPage() {
                         <div className="space-y-4">
                             <div className="text-[10px] font-mono text-white/40 uppercase">Lecture {lecture.order || 1}</div>
                             <VideoPlayer
-                                videoId={lecture.youtube_video_id}
+                                youtubeId={lecture.youtube_video_id}
+                                videoUrl={lecture.lecture_video}
                                 duration={formatDuration(lecture.duration_seconds)}
                             />
                         </div>
@@ -131,13 +132,15 @@ export default function LectureDetailPage() {
                                     : "bg-transparent border-transparent hover:bg-white/[0.02] hover:border-white/5"
                                     }`}
                             >
-                                <div className="relative w-24 flex-shrink-0 aspect-video rounded-lg overflow-hidden border border-white/5">
-                                    <Image
-                                        src={l.thumbnail_url}
-                                        alt={l.title}
-                                        fill
-                                        className={`object-cover ${l.id === parseInt(id) ? "opacity-80" : "opacity-50 group-hover:opacity-80"} transition-opacity`}
-                                    />
+                                <div className="relative w-24 flex-shrink-0 aspect-video rounded-lg overflow-hidden border border-white/5 bg-white/5">
+                                    {l.thumbnail_url && (
+                                        <Image
+                                            src={l.thumbnail_url}
+                                            alt={l.title}
+                                            fill
+                                            className={`object-cover ${l.id === parseInt(id) ? "opacity-80" : "opacity-50 group-hover:opacity-80"} transition-opacity`}
+                                        />
+                                    )}
                                     <div className="absolute inset-0 flex items-center justify-center">
                                         <svg className={`w-4 h-4 ${l.id === parseInt(id) ? "text-white" : "text-white/20 group-hover:text-white/40"}`} fill="currentColor" viewBox="0 0 24 24">
                                             <path d="M8 5v14l11-7z" />

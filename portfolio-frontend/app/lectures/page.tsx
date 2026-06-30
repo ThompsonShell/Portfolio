@@ -184,13 +184,15 @@ export default function LecturesPage() {
                 className="group relative bg-white/[0.02] p-8 hover:bg-white/[0.06] transition-all duration-500 flex flex-col h-full border-b border-white/5 last:border-b-0"
               >
                 {/* Thumbnail Container */}
-                <div className="relative aspect-video rounded-2xl overflow-hidden mb-8 border border-white/10 group-hover:border-white/20 transition-colors">
-                  <Image
-                    src={lecture.thumbnail_url}
-                    alt={lecture.title}
-                    fill
-                    className="object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700"
-                  />
+                <div className="relative aspect-video rounded-2xl overflow-hidden mb-8 border border-white/10 group-hover:border-white/20 transition-colors bg-white/5">
+                  {lecture.thumbnail_url && (
+                    <Image
+                      src={lecture.thumbnail_url}
+                      alt={lecture.title}
+                      fill
+                      className="object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700"
+                    />
+                  )}
                   {/* Play Icon - only on hover */}
                   <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                     <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/10 flex items-center justify-center scale-75 group-hover:scale-100 transition-all duration-500 shadow-2xl">

@@ -15,7 +15,9 @@ class LectureSerializer(serializers.ModelSerializer):
             "prev_id", "next_id"
         ]
 
-    def get_thumbnail_url(self, obj: Lecture) -> str:
+    def get_thumbnail_url(self, obj: Lecture) -> str | None:
+        if not obj.youtube_video_id:
+            return None
         return f"https://img.youtube.com/vi/{obj.youtube_video_id}/hqdefault.jpg"
 
     def get_prev_id(self, obj: Lecture) -> int | None:
