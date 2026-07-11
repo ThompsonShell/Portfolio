@@ -3,12 +3,17 @@ from django.urls import path, include
 
 from django.conf import settings
 from django.conf.urls.static import static
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    # JWT auth — Next.js POSTs credentials here to get a token for uploads.
+    path("api/auth/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("api/auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("api/", include("projects.urls")),
     path("api/", include("blog.urls")),
     path("api/", include("lectures.urls")),
+    path("api/", include("videos.urls")),
     path("api/", include("about.urls")),
     path("api/", include("coffee.urls")),
     path("api-auth/", include("rest_framework.urls")),

@@ -9,6 +9,10 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@uppy/core": "^4.5.3",
+    "@uppy/dashboard": "^4.4.3",
+    "@uppy/react": "^4.5.2",
+    "@uppy/tus": "^4.3.2",
     "framer-motion": "^11.0.0",
     "next": "14.2.15",
     "react": "^18.3.1",

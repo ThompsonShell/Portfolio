@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 import environ
 from pathlib import Path
 
@@ -10,7 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 environ.Env.read_env(BASE_DIR / ".env")
 
 SECRET_KEY = env("SECRET_KEY")
-DEBUG = env("DEBUG")
+DEBUG = env.bool("DEBUG", default=False)
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
 
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
@@ -25,6 +27,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # Third-party
     "rest_framework",
+    "rest_framework_simplejwt",
     "corsheaders",
     "cloudinary",
     "cloudinary_storage",
@@ -32,6 +35,7 @@ INSTALLED_APPS = [
     "projects",
     "blog",
     "lectures",
+    "videos",
     "about",
     "coffee",
 ]
@@ -113,10 +117,35 @@ else:
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # CORS
+from corsheaders.defaults import default_headers  # noqa: E402
+
 CORS_ALLOWED_ORIGINS = env.list(
     "CORS_ALLOWED_ORIGINS",
     default=["http://localhost:3000"],
 )
+
+# The browser needs to read these tus response headers cross-origin, and Uppy
+# needs to send the tus request headers. Without both lists the upload silently
+# stalls at 0% behind CORS.
+CORS_EXPOSE_HEADERS = [
+    "Location",
+    "Upload-Offset",
+    "Upload-Length",
+    "Tus-Resumable",
+    "Tus-Version",
+    "Tus-Extension",
+    "Tus-Max-Size",
+    "Upload-Metadata",
+]
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "tus-resumable",
+    "upload-length",
+    "upload-metadata",
+    "upload-offset",
+    "upload-concat",
+    "upload-defer-length",
+    "x-http-method-override",
+]
 
 # Email
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
@@ -130,9 +159,35 @@ ADMIN_NOTIFICATION_EMAIL = env("ADMIN_NOTIFICATION_EMAIL", default="asilbek.raja
 
 # DRF
 REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.AllowAny",
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
 }
+
+# JWT — the access token must outlive a full upload, otherwise a chunk request
+# can 401 mid-transfer (Uppy/tus does not refresh tokens on its own).
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=env.int("JWT_ACCESS_HOURS", default=12)),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+}
+
+# ── Chunked video upload ─────────────────────────────────────────────────────
+VIDEO_UPLOAD_MAX_SIZE = 6 * 1024 ** 3  # 6 GB hard cap
+VIDEO_UPLOAD_ALLOWED_EXTENSIONS = [".mp4", ".mov", ".mkv"]
+VIDEO_UPLOAD_READ_SIZE = 512 * 1024  # how much we read/write per loop while streaming a chunk
+
+# Shared secret for the tusd webhook (Option A). Leave empty to disable the check
+# and rely on network isolation + the forwarded JWT instead.
+TUSD_WEBHOOK_SECRET = env("TUSD_WEBHOOK_SECRET", default="")
+
+# We stream chunks straight to disk with request.read(), so Django never buffers a
+# whole chunk in memory. These limits only guard *other* (form/JSON) endpoints;
+# keep them modest but comfortably above one 10 MB chunk just in case.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024   # 20 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024   # 20 MB
