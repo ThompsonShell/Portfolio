@@ -147,15 +147,15 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
     "x-http-method-override",
 ]
 
-# Email
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = env("EMAIL_HOST", default="smtp.gmail.com")
-EMAIL_PORT = env.int("EMAIL_PORT", default=587)
-EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
-EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
-EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
-DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="ThompsonShell Portfolio <noreply@gmail.com>")
-ADMIN_NOTIFICATION_EMAIL = env("ADMIN_NOTIFICATION_EMAIL", default="asilbek.rajabov.offcial@gmail.com")
+# # Email
+# EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+# EMAIL_HOST = env("EMAIL_HOST", default="smtp.gmail.com")
+# EMAIL_PORT = env.int("EMAIL_PORT", default=587)
+# EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
+# EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
+# EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
+# DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="ThompsonShell Portfolio <noreply@gmail.com>")
+# ADMIN_NOTIFICATION_EMAIL = env("ADMIN_NOTIFICATION_EMAIL", default="asilbek.rajabov.offcial@gmail.com")
 
 # DRF
 REST_FRAMEWORK = {
