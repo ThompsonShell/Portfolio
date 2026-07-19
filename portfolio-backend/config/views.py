@@ -3,10 +3,10 @@ from django.http import HttpResponseRedirect, JsonResponse
 
 
 def custom_404(request, exception=None):
-    # API callers (fetch/axios) send Accept: application/json and need a JSON
-    # body to parse; a browser navigating directly is sent to the frontend's
-    # own styled not-found page instead of a bare Django error.
-    if request.path.startswith("/api/") and "text/html" not in request.headers.get("Accept", ""):
+    # /api/ is Django's own namespace — the frontend has no page for it, so a
+    # 404 there always stays JSON, browser or not. Everything else (e.g. an
+    # /admin typo) sends the browser to the frontend's styled not-found page.
+    if request.path.startswith("/api/"):
         return JsonResponse(
             {"detail": "Not found.", "status": 404, "path": request.path},
             status=404,
