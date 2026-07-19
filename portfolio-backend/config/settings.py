@@ -56,7 +56,7 @@ ROOT_URLCONF = "config.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -123,10 +123,6 @@ CORS_ALLOWED_ORIGINS = env.list(
     "CORS_ALLOWED_ORIGINS",
     default=["http://localhost:3000"],
 )
-
-# Non-API 404s redirect here so the browser lands on the frontend's own
-# styled not-found page instead of a bare Django error.
-FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:3000")
 
 # The browser needs to read these tus response headers cross-origin, and Uppy
 # needs to send the tus request headers. Without both lists the upload silently
