@@ -1,15 +1,8 @@
 from rest_framework import serializers
 
+from common.serializers import absolute_url
+
 from .models import Work, WorkChallenge, WorkFeature, WorkStat
-
-
-def absolute_url(serializer, file_field) -> str:
-    if not file_field:
-        return ""
-    request = serializer.context.get("request")
-    if request is not None:
-        return request.build_absolute_uri(file_field.url)
-    return file_field.url
 
 
 class WorkStatSerializer(serializers.ModelSerializer):

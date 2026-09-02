@@ -1,4 +1,7 @@
 from rest_framework import serializers
+
+from common.serializers import absolute_url
+
 from .models import Project
 
 
@@ -16,12 +19,7 @@ class ProjectSerializer(serializers.ModelSerializer):
         ]
 
     def get_cover_image_url(self, obj: Project) -> str:
-        if not obj.cover_image:
-            return ""
-        request = self.context.get("request")
-        if request is not None:
-            return request.build_absolute_uri(obj.cover_image.url)
-        return obj.cover_image.url
+        return absolute_url(self, obj.cover_image)
 
     def get_tech_tags(self, obj: Project) -> list[str]:
         if not obj.tech_tags:

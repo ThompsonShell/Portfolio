@@ -1,4 +1,7 @@
 from rest_framework import serializers
+
+from common.serializers import absolute_url
+
 from .models import Bio, Experience, Skill
 
 
@@ -17,6 +20,10 @@ class SkillSerializer(serializers.ModelSerializer):
 class BioSerializer(serializers.ModelSerializer):
     photo_url = serializers.SerializerMethodField()
     resume_url = serializers.SerializerMethodField()
+    # Experiences and skills are standalone tables, not FK'd to the Bio
+    # singleton, so the view passes them in via context after fetching each
+    # list once. Querying them from inside a method field would hide two
+    # extra queries behind what looks like a plain field.
     experiences = serializers.SerializerMethodField()
     skills = serializers.SerializerMethodField()
 
@@ -28,26 +35,19 @@ class BioSerializer(serializers.ModelSerializer):
         ]
 
     def get_photo_url(self, obj: Bio) -> str:
-        if not obj.photo:
-            return ""
-        request = self.context.get("request")
-        if request is not None:
-            return request.build_absolute_uri(obj.photo.url)
-        return obj.photo.url
+        return absolute_url(self, obj.photo)
 
     def get_resume_url(self, obj: Bio) -> str:
-        if not obj.resume:
-            return ""
-        request = self.context.get("request")
-        if request is not None:
-            return request.build_absolute_uri(obj.resume.url)
-        return obj.resume.url
+        return absolute_url(self, obj.resume)
 
     def get_experiences(self, obj: Bio) -> list[dict[str, object]]:
-        # Experiences are standalone — not FK'd to Bio (singleton pattern)
-        experiences = Experience.objects.all()
+        experiences = self.context.get("experiences")
+        if experiences is None:
+            experiences = Experience.objects.all()
         return ExperienceSerializer(experiences, many=True).data
 
     def get_skills(self, obj: Bio) -> list[dict[str, object]]:
-        skills = Skill.objects.all()
+        skills = self.context.get("skills")
+        if skills is None:
+            skills = Skill.objects.all()
         return SkillSerializer(skills, many=True).data

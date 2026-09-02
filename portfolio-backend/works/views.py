@@ -10,7 +10,11 @@ class WorkViewSet(viewsets.ReadOnlyModelViewSet):
     lookup_field = "slug"
 
     def get_queryset(self):
-        qs = Work.objects.prefetch_related("stats", "features", "challenges")
+        # Cards render `stats` only; `features` and `challenges` belong to the
+        # detail page, so prefetching them for a list was two extra queries
+        # fetching rows nothing serialized.
+        related = ("stats", "features", "challenges") if self.action == "retrieve" else ("stats",)
+        qs = Work.objects.prefetch_related(*related)
         params = self.request.query_params
 
         work_type = params.get("type")

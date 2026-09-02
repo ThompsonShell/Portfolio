@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from common.serializers import absolute_url
+
 from .models import Mentor
 
 
@@ -16,12 +18,7 @@ class MentorSerializer(serializers.ModelSerializer):
         ]
 
     def get_photo_url(self, obj: Mentor) -> str:
-        if not obj.photo:
-            return ""
-        request = self.context.get("request")
-        if request is not None:
-            return request.build_absolute_uri(obj.photo.url)
-        return obj.photo.url
+        return absolute_url(self, obj.photo)
 
     def get_tags(self, obj: Mentor) -> list[str]:
         return obj.tag_list

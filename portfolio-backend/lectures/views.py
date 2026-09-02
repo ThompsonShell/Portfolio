@@ -1,4 +1,4 @@
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from rest_framework import viewsets
 from rest_framework.permissions import AllowAny, IsAdminUser
 
@@ -41,7 +41,21 @@ class CourseViewSet(viewsets.ReadOnlyModelViewSet):
     lookup_field = "slug"
 
     def get_queryset(self):
-        qs = Course.objects.prefetch_related("lectures")
+        # The list serializer only ever reads duration/views off each lesson, so
+        # the card view prefetches just those columns. The detail view serializes
+        # the lessons in full, so it prefetches whole rows in player order.
+        if self.action == "retrieve":
+            lectures = Prefetch(
+                "lectures",
+                queryset=Lecture.objects.order_by("order", "id"),
+            )
+        else:
+            lectures = Prefetch(
+                "lectures",
+                queryset=Lecture.objects.only("id", "course_id", "duration_seconds", "views_count"),
+            )
+
+        qs = Course.objects.prefetch_related(lectures)
         params = self.request.query_params
 
         category = params.get("category")

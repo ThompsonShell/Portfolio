@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from common.serializers import absolute_url
+
 from .models import Course, Lecture
 
 
@@ -27,32 +29,49 @@ class LectureSerializer(serializers.ModelSerializer):
             return None
         return f"https://img.youtube.com/vi/{obj.youtube_video_id}/hqdefault.jpg"
 
-    def _siblings(self, obj: Lecture):
-        """Lessons this one sits among: its course when it has one, else its category."""
-        if obj.course_id:
-            return Lecture.objects.filter(course_id=obj.course_id).order_by("order", "id")
-        return Lecture.objects.filter(course__isnull=True, category=obj.category).order_by("order", "id")
+    def _sibling_ids(self, obj: Lecture) -> list[int]:
+        """Ordered ids of the lessons this one sits among — its course when it
+        has one, else its category.
+
+        Four fields (position, count, prev, next) all describe the same ordered
+        list, so it is fetched once and cached per serializer instance. Without
+        the cache each lesson cost four identical queries, which on a course
+        detail page multiplied by every lesson in the course.
+        """
+        key = ("course", obj.course_id) if obj.course_id else ("category", obj.category)
+        cache = self.context.setdefault("_sibling_ids", {})
+        if key not in cache:
+            if obj.course_id:
+                qs = Lecture.objects.filter(course_id=obj.course_id)
+            else:
+                qs = Lecture.objects.filter(course__isnull=True, category=obj.category)
+            cache[key] = list(qs.order_by("order", "id").values_list("id", flat=True))
+        return cache[key]
+
+    def _index(self, obj: Lecture) -> int:
+        """Position of this lesson in its sibling list, or -1 when absent."""
+        ids = self._sibling_ids(obj)
+        return ids.index(obj.id) if obj.id in ids else -1
 
     def get_position(self, obj: Lecture) -> int:
-        ids = list(self._siblings(obj).values_list("id", flat=True))
-        return ids.index(obj.id) + 1 if obj.id in ids else 1
+        index = self._index(obj)
+        return index + 1 if index >= 0 else 1
 
     def get_course_lesson_count(self, obj: Lecture) -> int:
-        return self._siblings(obj).count()
+        return len(self._sibling_ids(obj))
 
     def get_prev_id(self, obj: Lecture) -> int | None:
-        ids = list(self._siblings(obj).values_list("id", flat=True))
-        if obj.id not in ids:
+        index = self._index(obj)
+        if index <= 0:
             return None
-        i = ids.index(obj.id)
-        return ids[i - 1] if i > 0 else None
+        return self._sibling_ids(obj)[index - 1]
 
     def get_next_id(self, obj: Lecture) -> int | None:
-        ids = list(self._siblings(obj).values_list("id", flat=True))
-        if obj.id not in ids:
+        index = self._index(obj)
+        ids = self._sibling_ids(obj)
+        if index < 0 or index >= len(ids) - 1:
             return None
-        i = ids.index(obj.id)
-        return ids[i + 1] if i < len(ids) - 1 else None
+        return ids[index + 1]
 
     def validate(self, attrs):
         youtube_video_id = attrs.get("youtube_video_id", getattr(self.instance, "youtube_video_id", None))
@@ -66,8 +85,8 @@ class LectureSerializer(serializers.ModelSerializer):
 
 class CourseSerializer(serializers.ModelSerializer):
     cover_image_url = serializers.SerializerMethodField()
-    lesson_count = serializers.IntegerField(read_only=True)
-    total_seconds = serializers.IntegerField(read_only=True)
+    lesson_count = serializers.SerializerMethodField()
+    total_seconds = serializers.SerializerMethodField()
     total_views = serializers.SerializerMethodField()
 
     class Meta:
@@ -79,15 +98,20 @@ class CourseSerializer(serializers.ModelSerializer):
         ]
 
     def get_cover_image_url(self, obj: Course) -> str:
-        if not obj.cover_image:
-            return ""
-        request = self.context.get("request")
-        if request is not None:
-            return request.build_absolute_uri(obj.cover_image.url)
-        return obj.cover_image.url
+        return absolute_url(self, obj.cover_image)
+
+    # The view prefetches `lectures`, so these three read the already-loaded
+    # rows. Going through the model's `lesson_count` / `total_seconds`
+    # properties would call .count()/.all() on the manager and re-query per
+    # course instead.
+    def get_lesson_count(self, obj: Course) -> int:
+        return len(obj.lectures.all())
+
+    def get_total_seconds(self, obj: Course) -> int:
+        return sum(lecture.duration_seconds for lecture in obj.lectures.all())
 
     def get_total_views(self, obj: Course) -> int:
-        return sum(l.views_count for l in obj.lectures.all())
+        return sum(lecture.views_count for lecture in obj.lectures.all())
 
 
 class CourseDetailSerializer(CourseSerializer):

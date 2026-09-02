@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from django.db.models import Sum
+from django.db.models import Count, Q, Sum
 from django.utils import timezone
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
@@ -23,20 +23,30 @@ class SiteStatsView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request: Request) -> Response:
-        lectures = Lecture.objects.all()
-        posts = Post.objects.filter(published_at__isnull=False)
-
-        total_seconds = lectures.aggregate(total=Sum("duration_seconds"))["total"] or 0
         recent_cutoff = timezone.now() - timedelta(days=30)
+
+        # One aggregate per table rather than one per number: the five lecture
+        # figures came from five separate scans of the same rows, and the two
+        # post figures from two.
+        lecture_stats = Lecture.objects.aggregate(
+            count=Count("id"),
+            total_seconds=Sum("duration_seconds"),
+            views=Sum("views_count"),
+            recent=Count("id", filter=Q(created_at__gte=recent_cutoff)),
+        )
+        post_stats = Post.objects.filter(published_at__isnull=False).aggregate(
+            count=Count("id"),
+            views=Sum("views_count"),
+        )
 
         return Response({
             "works": Work.objects.count(),
             "courses": Course.objects.count(),
-            "lectures": lectures.count(),
-            "posts": posts.count(),
+            "lectures": lecture_stats["count"],
+            "posts": post_stats["count"],
             "mentors": Mentor.objects.count(),
-            "lecture_hours": round(total_seconds / 3600),
-            "new_lectures": lectures.filter(created_at__gte=recent_cutoff).count(),
-            "post_views": posts.aggregate(total=Sum("views_count"))["total"] or 0,
-            "lecture_views": lectures.aggregate(total=Sum("views_count"))["total"] or 0,
+            "lecture_hours": round((lecture_stats["total_seconds"] or 0) / 3600),
+            "new_lectures": lecture_stats["recent"],
+            "post_views": post_stats["views"] or 0,
+            "lecture_views": lecture_stats["views"] or 0,
         })
