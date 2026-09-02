@@ -1,172 +1,344 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import Image from "next/image";
-import Link from "next/link";
 import dynamic from "next/dynamic";
-import { getLecture, getLectures } from "@/lib/api";
-import type { Lecture } from "@/lib/types";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useLanguage } from "@/components/i18n/LanguageProvider";
+import Container from "@/components/ui/Container";
 import Skeleton from "@/components/ui/Skeleton";
+import { getCourse, getLecture, getLectures, registerLectureView } from "@/lib/api";
+import { compactNumber, formatDuration } from "@/lib/format";
+import { useProgress } from "@/lib/useProgress";
+import type { Lecture } from "@/lib/types";
 
-const VideoPlayer = dynamic(() => import("@/components/lectures/VideoPlayer"), { ssr: false });
-const Terminal = dynamic(() => import("../../../components/lectures/Terminal"), { ssr: false });
+const VideoPlayer = dynamic(() => import("@/components/lectures/VideoPlayer"), {
+  ssr: false,
+});
 
 export default function LectureDetailPage() {
-    const { id } = useParams() as { id: string };
-    const [lecture, setLecture] = useState<Lecture | null>(null);
-    const [allLectures, setAllLectures] = useState<Lecture[]>([]);
-    const [loading, setLoading] = useState(true);
+  const { id } = useParams<{ id: string }>();
+  const { t, locale } = useLanguage();
 
-    useEffect(() => {
-        setLoading(true);
-        Promise.all([getLecture(id), getLectures(undefined, undefined)])
-            .then(([data, all]) => {
-                setLecture(data);
-                setAllLectures(all);
-            })
-            .catch(console.error)
-            .finally(() => setLoading(false));
-    }, [id]);
+  const { markWatched, isWatched, ready } = useProgress();
 
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-black pt-32 pb-24 px-4 text-white">
-                <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12">
-                    <div className="lg:col-span-6 space-y-8">
-                        <Skeleton className="aspect-video w-full rounded-[2.5rem] bg-white/5" />
-                        <Skeleton className="h-12 w-1/2 rounded-2xl bg-white/5" />
-                        <Skeleton className="h-24 w-full rounded-2xl bg-white/5" />
-                    </div>
-                    <div className="lg:col-span-6">
-                        <Skeleton className="h-[600px] w-full rounded-2xl bg-white/5" />
-                    </div>
-                </div>
-            </div>
-        );
-    }
+  const [lecture, setLecture] = useState<Lecture | null>(null);
+  const [siblings, setSiblings] = useState<Lecture[]>([]);
+  const [views, setViews] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-    if (!lecture) {
-        return (
-            <div className="min-h-screen bg-black text-white pt-32 pb-24 px-4 flex flex-col items-center justify-center">
-                <h1 className="text-4xl font-bold mb-4">Lecture not found</h1>
-                <p className="text-white/60">Could not retrieve the lecture. Check console for fetch errors or return to lectures list.</p>
-                <Link href="/lectures" className="mt-8 px-6 py-3 bg-white/10 rounded-xl hover:bg-white/20 transition-all font-medium">All Lectures</Link>
-            </div>
-        );
-    }
-
-    const formatDuration = (seconds: number): string => {
-        const minutes = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${minutes}:${secs.toString().padStart(2, "0")}`;
+  useEffect(() => {
+    if (!id) return;
+    let active = true;
+    setLoading(true);
+    getLecture(id, locale)
+      .then((data) => {
+        if (!active) return;
+        setLecture(data);
+        setViews(data.views_count);
+      })
+      .catch(() => active && setLecture(null))
+      .finally(() => active && setLoading(false));
+    return () => {
+      active = false;
     };
+  }, [id, locale]);
 
+  // Count the view once per visitor; the API ignores repeats. Language is not
+  // a dependency — switching it must not inflate the counter.
+  useEffect(() => {
+    if (!id) return;
+    let active = true;
+    registerLectureView(id)
+      .then((res) => active && setViews(res.views_count))
+      .catch(() => {
+        // A failed count must never break the page.
+      });
+    return () => {
+      active = false;
+    };
+  }, [id]);
+
+  // The playlist is the lesson's course, falling back to its category.
+  useEffect(() => {
+    if (!lecture) return;
+    let active = true;
+
+    const load = lecture.course_slug
+      ? getCourse(lecture.course_slug, locale).then((c) => c.lectures)
+      : getLectures(locale, { category: lecture.category });
+
+    load
+      .then((data) => active && setSiblings(data))
+      .catch(() => active && setSiblings([]));
+    return () => {
+      active = false;
+    };
+  }, [lecture, locale]);
+
+  // Watching a lesson marks it done for this browser.
+  useEffect(() => {
+    if (!lecture?.course_slug) return;
+    markWatched(lecture.course_slug, lecture.id);
+  }, [lecture, markWatched]);
+
+  const { index, prev, next } = useMemo(() => {
+    const i = siblings.findIndex((l) => String(l.id) === String(id));
+    return {
+      index: i,
+      prev: i > 0 ? siblings[i - 1] : null,
+      next: i >= 0 && i < siblings.length - 1 ? siblings[i + 1] : null,
+    };
+  }, [siblings, id]);
+
+  if (loading) {
     return (
-        <div className="min-h-screen bg-black text-white">
-            <div className="max-w-[90rem] mx-auto px-4 pt-32 pb-24">
-
-                {/* Breadcrumbs */}
-                <nav className="flex items-center gap-3 text-[11px] font-medium text-white/20 uppercase tracking-widest mb-12">
-                    <Link href="/lectures" className="text-white/40 hover:text-white transition-colors">Lectures</Link>
-                    <span className="w-1 h-1 rounded-full bg-white/20" />
-                    <span className="text-white/60">{lecture.category}</span>
-                    <span className="w-1 h-1 rounded-full bg-white/10" />
-                    <span className="text-white truncate max-w-[200px] md:max-w-none">{lecture.title}</span>
-                </nav>
-
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start mb-12">
-                    {/* Main Content - Video Player */}
-                    <div className="lg:col-span-5 space-y-6">
-                        <div className="space-y-4">
-                            <div className="text-[10px] font-mono text-white/40 uppercase">Lecture {lecture.order || 1}</div>
-                            <VideoPlayer
-                                youtubeId={lecture.youtube_video_id}
-                                videoUrl={lecture.lecture_video}
-                                duration={formatDuration(lecture.duration_seconds)}
-                            />
-                        </div>
-
-                        {/* Info Section */}
-                        <div className="space-y-6">
-                            <h1 className="text-2xl md:text-3xl font-bold tracking-tighter text-white">
-                                {lecture.title}
-                            </h1>
-
-                            <p className="text-sm text-white/60 leading-relaxed">
-                                {lecture.description || "This lecture covers core backend concepts and their real-world implementation principles. Detailed explanations are provided in the video."}
-                            </p>
-
-                            <div className="flex flex-wrap gap-2 pt-2">
-                                {[lecture.category, "Beginner", `${Math.floor(lecture.duration_seconds / 60)} min`].map(tag => (
-                                    <span key={tag} className="px-4 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[10px] font-medium text-white/60">
-                                        {tag}
-                                    </span>
-                                ))}
-                            </div>
-                        </div>
-
-                    </div>
-
-                    {/* Sidebar - Terminal */}
-                    <div className="lg:col-span-7 h-[600px] lg:h-[800px]">
-                        <Terminal />
-                    </div>
-                </div>
-
-                {/* Bottom Section - All Lectures List */}
-                <div className="mt-12 pt-12 border-t border-white/5">
-                    <div className="flex items-center justify-between mb-8">
-                        <div className="text-[11px] font-mono text-white/40 uppercase tracking-[0.2em]">
-                            Browse More Lectures
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {allLectures.map((l, idx) => (
-                            <Link
-                                key={l.id}
-                                href={`/lectures/${l.id}`}
-                                className={`flex items-start gap-4 p-4 rounded-2xl border transition-all group ${l.id === parseInt(id)
-                                    ? "bg-white/5 border-white/10"
-                                    : "bg-transparent border-transparent hover:bg-white/[0.02] hover:border-white/5"
-                                    }`}
-                            >
-                                <div className="relative w-24 flex-shrink-0 aspect-video rounded-lg overflow-hidden border border-white/5 bg-white/5">
-                                    {l.thumbnail_url && (
-                                        <Image
-                                            src={l.thumbnail_url}
-                                            alt={l.title}
-                                            fill
-                                            className={`object-cover ${l.id === parseInt(id) ? "opacity-80" : "opacity-50 group-hover:opacity-80"} transition-opacity`}
-                                        />
-                                    )}
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                        <svg className={`w-4 h-4 ${l.id === parseInt(id) ? "text-white" : "text-white/20 group-hover:text-white/40"}`} fill="currentColor" viewBox="0 0 24 24">
-                                            <path d="M8 5v14l11-7z" />
-                                        </svg>
-                                    </div>
-                                    <div className="absolute bottom-1 right-1 text-[8px] font-bold text-white/60 bg-black/60 px-1 rounded">
-                                        {formatDuration(l.duration_seconds)}
-                                    </div>
-                                </div>
-                                <div className="flex-1">
-                                    <div className="text-xs font-medium text-white/80 group-hover:text-white transition-colors line-clamp-2">
-                                        {idx + 1}. {l.title}
-                                    </div>
-                                    <div className="flex items-center gap-2 text-[9px] text-white/40 font-mono mt-2">
-                                        <span>{l.category}</span>
-                                        <span className="w-1 h-1 rounded-full bg-white/5" />
-                                        <span className={l.id === parseInt(id) ? "text-[#27C93F]" : ""}>
-                                            {l.id === parseInt(id) ? "Current" : "Watch Now"}
-                                        </span>
-                                    </div>
-                                </div>
-                            </Link>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </div>
+      <div>
+        <Skeleton className="h-[420px] rounded-none" />
+        <Container className="py-12 space-y-5">
+          <Skeleton className="h-10 w-2/3" />
+          <Skeleton className="h-40 w-full rounded-2xl" />
+        </Container>
+      </div>
     );
+  }
+
+  if (!lecture) {
+    return (
+      <Container className="py-24 text-center">
+        <h1 className="text-[28px] font-extrabold text-ink tracking-tight">
+          {t.notFound.title}
+        </h1>
+        <p className="mt-3 text-[15px] text-ink-muted">{t.common.error}</p>
+        <Link
+          href="/lectures"
+          className="mt-7 inline-block px-6 py-3 rounded-xl bg-accent text-white text-[14px] font-semibold hover:bg-[#6D28D9] transition-colors"
+        >
+          ← {t.nav.lectures}
+        </Link>
+      </Container>
+    );
+  }
+
+  const lessonNumber = lecture.position || (index >= 0 ? index + 1 : 1);
+  const lessonTotal = lecture.course_lesson_count || siblings.length;
+  const courseSlug = lecture.course_slug;
+
+  return (
+    <>
+      {/* Video stage */}
+      <section className="bg-[#0B0A1F]">
+        <div className="max-w-[1200px] mx-auto px-0 md:px-7">
+          <div className="md:rounded-b-2xl overflow-hidden">
+            <VideoPlayer
+              youtubeId={lecture.youtube_video_id}
+              videoUrl={lecture.lecture_video}
+              duration={formatDuration(lecture.duration_seconds)}
+            />
+          </div>
+        </div>
+      </section>
+
+      <Container className="py-12 grid lg:grid-cols-[1fr_360px] gap-10 items-start pb-20">
+        {/* Main column */}
+        <div className="min-w-0">
+          <nav className="flex flex-wrap items-center gap-2 text-[13px] font-medium text-ink-subtle mb-5">
+            <Link href="/lectures" className="hover:text-accent transition-colors">
+              {t.nav.lectures}
+            </Link>
+            <span>›</span>
+            {lecture.course_slug ? (
+              <Link
+                href={`/lectures/course/${lecture.course_slug}`}
+                className="hover:text-accent transition-colors"
+              >
+                {lecture.course_title}
+              </Link>
+            ) : (
+              <span className="capitalize">{lecture.category}</span>
+            )}
+            <span>›</span>
+            <span className="text-ink-muted">
+              {t.lectures.lesson} #{lessonNumber}
+            </span>
+          </nav>
+
+          <div className="flex flex-wrap gap-2 mb-5">
+            <span className="px-2.5 py-1 rounded-md bg-accent-soft text-accent text-[11px] font-bold capitalize">
+              {lecture.category}
+            </span>
+            {lessonTotal > 0 && (
+              <span className="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-bold">
+                {t.lectures.lesson} {lessonNumber}/{lessonTotal}
+              </span>
+            )}
+          </div>
+
+          <h1 className="text-[32px] md:text-[40px] font-extrabold text-ink tracking-tight leading-[1.1]">
+            {lecture.title}
+          </h1>
+
+          {lecture.description && (
+            <p className="mt-4 text-[16px] leading-relaxed text-ink-muted">
+              {lecture.description}
+            </p>
+          )}
+
+          <div className="mt-6 flex flex-wrap items-center gap-6 text-[13px] font-medium text-ink-subtle">
+            {lecture.duration_seconds > 0 && (
+              <span className="flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 6v6l4 2" />
+                </svg>
+                {Math.round(lecture.duration_seconds / 60)} {t.common.minutes}
+              </span>
+            )}
+            {views > 0 && (
+              <span className="flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                {compactNumber(views)} {t.common.views}
+              </span>
+            )}
+            {lecture.created_at && (
+              <span>
+                {new Intl.DateTimeFormat(locale === "uz" ? "uz-UZ" : "en-US", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                }).format(new Date(lecture.created_at))}
+              </span>
+            )}
+          </div>
+
+          {/* Prev / next */}
+          {(prev || next) && (
+            <div className="mt-10 grid sm:grid-cols-2 gap-5">
+              {prev ? (
+                <Link
+                  href={`/lectures/${prev.id}`}
+                  className="group bg-surface border border-line rounded-2xl shadow-card hover:shadow-card-hover transition-shadow p-5"
+                >
+                  <div className="text-[12px] font-medium text-ink-subtle">
+                    ← {t.common.previous}
+                  </div>
+                  <div className="mt-1.5 text-[14px] font-extrabold text-ink group-hover:text-accent transition-colors line-clamp-1">
+                    {prev.title}
+                  </div>
+                </Link>
+              ) : (
+                <div className="bg-surface/60 border border-line rounded-2xl p-5">
+                  <div className="text-[12px] font-medium text-ink-subtle/60">
+                    ← {t.common.previous}
+                  </div>
+                  <div className="mt-1.5 text-[14px] font-extrabold text-ink-subtle/60">
+                    {t.lectures.courseIntro}
+                  </div>
+                </div>
+              )}
+
+              {next && (
+                <Link
+                  href={`/lectures/${next.id}`}
+                  className="group bg-surface border border-line rounded-2xl shadow-card hover:shadow-card-hover transition-shadow p-5 text-right"
+                >
+                  <div className="text-[12px] font-medium text-ink-subtle">
+                    {t.common.next} →
+                  </div>
+                  <div className="mt-1.5 text-[14px] font-extrabold text-ink group-hover:text-accent transition-colors line-clamp-1">
+                    {next.title}
+                  </div>
+                </Link>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Playlist sidebar */}
+        <aside className="bg-surface border border-line rounded-2xl shadow-card p-6 lg:sticky lg:top-[78px]">
+          <div className="flex items-baseline justify-between gap-3">
+            {courseSlug ? (
+              <Link
+                href={`/lectures/course/${courseSlug}`}
+                className="text-[16px] font-extrabold text-ink tracking-tight hover:text-accent transition-colors"
+              >
+                {lecture.course_title}
+              </Link>
+            ) : (
+              <h2 className="text-[16px] font-extrabold text-ink tracking-tight capitalize">
+                {lecture.category}
+              </h2>
+            )}
+            <span className="text-[12px] font-medium text-ink-subtle shrink-0">
+              {lessonTotal} {t.lectures.lessons}
+            </span>
+          </div>
+
+          {lessonTotal > 0 && (
+            <div className="mt-4">
+              <div className="h-1 rounded-full bg-canvas overflow-hidden">
+                <div
+                  className="h-full bg-accent rounded-full transition-[width]"
+                  style={{ width: `${(lessonNumber / lessonTotal) * 100}%` }}
+                />
+              </div>
+              <div className="mt-2 text-right text-[11px] font-medium text-ink-subtle">
+                {lessonNumber}/{lessonTotal}
+              </div>
+            </div>
+          )}
+
+          <ol className="mt-4 space-y-1.5 max-h-[460px] overflow-y-auto">
+            {siblings.map((item, i) => {
+              const current = String(item.id) === String(id);
+              const watched =
+                ready && !!courseSlug && isWatched(courseSlug, item.id);
+              return (
+                <li key={item.id}>
+                  <Link
+                    href={`/lectures/${item.id}`}
+                    aria-current={current ? "true" : undefined}
+                    className={`flex items-start gap-3 p-3 rounded-xl transition-colors ${
+                      current
+                        ? "bg-accent-soft border-l-[3px] border-accent"
+                        : "hover:bg-canvas"
+                    }`}
+                  >
+                    <span
+                      className={`w-7 h-7 rounded-lg grid place-items-center text-[11px] font-bold shrink-0 ${
+                        current
+                          ? "bg-accent text-white"
+                          : watched
+                            ? "bg-emerald-50 text-emerald-600"
+                            : "bg-canvas text-ink-subtle"
+                      }`}
+                    >
+                      {current ? "▶" : watched ? "✓" : i + 1}
+                    </span>
+                    <span className="min-w-0">
+                      <span
+                        className={`block text-[13.5px] font-bold leading-snug line-clamp-2 ${
+                          current ? "text-accent" : "text-ink"
+                        }`}
+                      >
+                        {item.title}
+                      </span>
+                      {item.duration_seconds > 0 && (
+                        <span className="block mt-0.5 text-[11px] font-medium text-ink-subtle">
+                          {formatDuration(item.duration_seconds)}
+                        </span>
+                      )}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ol>
+        </aside>
+      </Container>
+    </>
+  );
 }

@@ -9,7 +9,7 @@ class PostListSerializer(serializers.ModelSerializer):
         model = Post
         fields = [
             "id", "title", "slug", "cover_image_url",
-            "excerpt", "reading_time", "published_at",
+            "excerpt", "reading_time", "published_at", "views_count",
         ]
 
     def get_cover_image_url(self, obj: Post) -> str:
@@ -28,7 +28,7 @@ class PostDetailSerializer(serializers.ModelSerializer):
         model = Post
         fields = [
             "id", "title", "slug", "cover_image_url",
-            "content", "excerpt", "reading_time", "published_at",
+            "content", "excerpt", "reading_time", "published_at", "views_count",
         ]
 
     def get_cover_image_url(self, obj: Post) -> str:

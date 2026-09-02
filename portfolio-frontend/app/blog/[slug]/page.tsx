@@ -1,129 +1,286 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import Button from "@/components/ui/Button";
+import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
+import { useLanguage } from "@/components/i18n/LanguageProvider";
+import Container from "@/components/ui/Container";
 import Skeleton from "@/components/ui/Skeleton";
-import { getPost } from "@/lib/api";
-import type { PostDetail } from "@/lib/types";
+import { getPost, getPosts, registerPostView } from "@/lib/api";
+import { compactNumber } from "@/lib/format";
+import type { PostDetail, PostSummary } from "@/lib/types";
+
+const ACCENTS = ["#3B82F6", "#A855F7", "#22C55E", "#F59E0B"];
 
 export default function BlogPostPage() {
-  const params = useParams();
-  const slug = params.slug as string;
+  const { slug } = useParams<{ slug: string }>();
+  const { t, locale } = useLanguage();
+
   const [post, setPost] = useState<PostDetail | null>(null);
+  const [related, setRelated] = useState<PostSummary[]>([]);
+  const [views, setViews] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!slug) return;
-    getPost(slug)
-      .then(setPost)
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
+    let active = true;
+    setLoading(true);
+    setError(false);
+    getPost(slug, locale)
+      .then((data) => {
+        if (!active) return;
+        setPost(data);
+        setViews(data.views_count);
+      })
+      .catch(() => active && setError(true))
+      .finally(() => active && setLoading(false));
+    return () => {
+      active = false;
+    };
+  }, [slug, locale]);
+
+  // Count the read once per visitor; the API ignores repeats. Deliberately not
+  // keyed on locale — switching language must not inflate the counter.
+  useEffect(() => {
+    if (!slug) return;
+    let active = true;
+    registerPostView(slug)
+      .then((res) => active && setViews(res.views_count))
+      .catch(() => {
+        // A failed count must never break the article.
+      });
+    return () => {
+      active = false;
+    };
   }, [slug]);
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+  useEffect(() => {
+    let active = true;
+    getPosts(locale)
+      .then((data) => active && setRelated(data.filter((p) => p.slug !== slug).slice(0, 2)))
+      .catch(() => active && setRelated([]));
+    return () => {
+      active = false;
+    };
+  }, [slug, locale]);
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard blocked — nothing useful to show the reader.
+    }
   };
+
+  const formatDate = (value: string) =>
+    value
+      ? new Intl.DateTimeFormat(locale === "uz" ? "uz-UZ" : "en-US", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        }).format(new Date(value))
+      : "";
 
   if (loading) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-12 space-y-4">
-        <Skeleton className="h-8 w-3/4" />
-        <Skeleton className="h-4 w-1/3" />
-        <Skeleton className="h-64 w-full" />
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-2/3" />
-      </div>
+      <Container className="py-16 max-w-3xl space-y-5">
+        <Skeleton className="h-5 w-40" />
+        <Skeleton className="h-14 w-full" />
+        <Skeleton className="h-64 w-full rounded-2xl" />
+      </Container>
     );
   }
 
   if (error || !post) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-20 text-center">
-        <h1 className="text-2xl font-bold text-text-primary mb-4">Post not found</h1>
-        <p className="text-text-secondary mb-6">
-          The blog post you&apos;re looking for doesn&apos;t exist or has been removed.
-        </p>
-        <Link href="/blog" className="text-accent-primary hover:underline">
-          &larr; Back to Blog
+      <Container className="py-24 text-center">
+        <h1 className="text-[28px] font-extrabold text-ink tracking-tight">
+          {t.notFound.title}
+        </h1>
+        <p className="mt-3 text-[15px] text-ink-muted">{t.common.error}</p>
+        <Link
+          href="/blog"
+          className="mt-7 inline-block px-6 py-3 rounded-xl bg-accent text-white text-[14px] font-semibold hover:bg-[#6D28D9] transition-colors"
+        >
+          ← {t.nav.blog}
         </Link>
-      </div>
+      </Container>
     );
   }
 
+  const shareUrl = typeof window !== "undefined" ? window.location.href : "";
+
   return (
-    <article className="max-w-3xl mx-auto px-4 py-24">
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <Link
-          href="/blog"
-          className="text-text-secondary hover:text-accent-primary transition-colors text-xs font-bold uppercase tracking-widest mb-8 inline-flex items-center gap-2"
-        >
-          <span className="text-accent-primary">←</span> Back to Blog
+    <div className="max-w-[820px] mx-auto px-5 md:px-7 pb-20">
+      <nav className="flex items-center gap-2 text-[13px] font-medium text-ink-subtle pt-10 mb-6">
+        <Link href="/blog" className="hover:text-accent transition-colors">
+          {t.nav.blog}
         </Link>
+        <span>›</span>
+        <span className="text-ink-muted line-clamp-1">{post.title}</span>
+      </nav>
 
-        <h1 className="text-4xl md:text-6xl font-bold text-text-primary tracking-tighter mb-6 leading-tight">
-          {post.title}
-        </h1>
+      <div className="flex flex-wrap items-center gap-3 text-[12px] font-medium text-ink-subtle mb-5">
+        <span className="px-2.5 py-1 rounded-md bg-accent-soft text-accent font-bold">
+          {t.nav.blog}
+        </span>
+        <span>{formatDate(post.published_at)}</span>
+        <span>·</span>
+        <span>
+          {post.reading_time} {t.common.minRead}
+        </span>
+        {views > 0 && (
+          <>
+            <span>·</span>
+            <span>
+              {compactNumber(views)} {t.common.views}
+            </span>
+          </>
+        )}
+      </div>
 
-        <div className="flex items-center gap-4 text-xs font-medium uppercase tracking-widest text-text-secondary/60 mb-12">
-          <span>{formatDate(post.published_at)}</span>
-          <span className="w-1.5 h-1.5 bg-accent-primary/20 rounded-full" />
-          <span>{post.reading_time} min read</span>
-        </div>
-      </motion.div>
+      <h1 className="text-[38px] md:text-[46px] font-extrabold text-ink tracking-tight leading-[1.08]">
+        {post.title}
+      </h1>
 
-      {post.cover_image_url && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.7, delay: 0.2 }}
-          className="relative h-64 md:h-[400px] w-full rounded-[2.5rem] overflow-hidden mb-16 shadow-2xl"
-        >
-          <Image
-            src={post.cover_image_url}
-            alt={post.title}
-            fill
-            className="object-cover"
-            priority
-          />
-        </motion.div>
+      {post.excerpt && (
+        <p className="mt-5 text-[18px] leading-relaxed text-ink-muted">
+          {post.excerpt}
+        </p>
       )}
 
-      {/* Markdown content rendered with syntax highlighting */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.8, delay: 0.4 }}
-        className="prose prose-invert prose-lg max-w-none prose-headings:text-text-primary prose-headings:tracking-tight prose-p:text-text-secondary prose-p:leading-relaxed prose-a:text-accent-primary prose-strong:text-text-primary prose-code:text-accent-primary bg-surface/30 p-8 md:p-12 rounded-[2.5rem] border border-border-subtle"
-      >
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          rehypePlugins={[rehypeHighlight]}
+      {/* Author row */}
+      <div className="mt-9 pb-7 border-b border-line flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <span className="w-11 h-11 rounded-full bg-accent-soft text-accent grid place-items-center text-[13px] font-extrabold">
+            AR
+          </span>
+          <div>
+            <div className="text-[14px] font-extrabold text-ink">
+              Asilbek Rajabov
+            </div>
+            <div className="text-[12px] font-medium text-ink-subtle">
+              Developer · asilbek.dev
+            </div>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={copyLink}
+          aria-label={t.blog.copyLink}
+          className="w-9 h-9 grid place-items-center rounded-lg border border-line text-ink-muted hover:text-accent hover:border-accent/40 transition-colors"
         >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+            <path d="m16 6-4-4-4 4" />
+            <path d="M12 2v13" />
+          </svg>
+        </button>
+      </div>
+
+      {post.cover_image_url && (
+        <img
+          src={post.cover_image_url}
+          alt={post.title}
+          className="mt-9 w-full rounded-2xl border border-line"
+        />
+      )}
+
+      {/* Article body */}
+      <div
+        className="prose-body mt-10 max-w-none
+          [&_h2]:text-[26px] [&_h2]:font-extrabold [&_h2]:text-ink [&_h2]:tracking-tight [&_h2]:mt-12 [&_h2]:mb-4
+          [&_h3]:text-[20px] [&_h3]:font-extrabold [&_h3]:text-ink [&_h3]:mt-9 [&_h3]:mb-3
+          [&_p]:text-[16.5px] [&_p]:leading-[1.85] [&_p]:text-ink-muted [&_p]:mb-5
+          [&_a]:text-accent [&_a]:font-medium hover:[&_a]:underline
+          [&_strong]:text-ink [&_strong]:font-bold
+          [&_ul]:my-5 [&_ul]:pl-5 [&_ul]:list-disc [&_ol]:my-5 [&_ol]:pl-5 [&_ol]:list-decimal
+          [&_li]:text-[16px] [&_li]:leading-[1.8] [&_li]:text-ink-muted [&_li]:mb-2
+          [&_blockquote]:border-l-4 [&_blockquote]:border-accent [&_blockquote]:pl-5 [&_blockquote]:italic [&_blockquote]:text-ink-muted
+          [&_pre]:my-6 [&_pre]:overflow-x-auto
+          [&_:not(pre)>code]:bg-canvas [&_:not(pre)>code]:text-accent-ink [&_:not(pre)>code]:px-1.5 [&_:not(pre)>code]:py-0.5 [&_:not(pre)>code]:rounded [&_:not(pre)>code]:text-[0.9em] [&_:not(pre)>code]:font-mono
+          [&_img]:rounded-2xl [&_img]:border [&_img]:border-line
+          [&_table]:w-full [&_table]:text-[14px] [&_th]:text-left [&_th]:font-bold [&_th]:text-ink [&_td]:text-ink-muted [&_th]:border-b [&_td]:border-b [&_th]:border-line [&_td]:border-line [&_th]:py-2 [&_td]:py-2"
+      >
+        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
           {post.content}
         </ReactMarkdown>
-      </motion.div>
-
-      <div className="mt-24 pt-12 border-t border-border-subtle text-center">
-        <p className="text-text-secondary text-sm mb-6">Enjoyed this post? Share your thoughts!</p>
-        <Button href="/coffee" variant="primary" className="rounded-full px-10">Coffee Chat</Button>
       </div>
-    </article>
+
+      {/* Share bar */}
+      <div className="mt-12 pt-7 border-t border-line flex flex-wrap items-center gap-3">
+        <span className="text-[13px] font-medium text-ink-subtle">
+          {t.blog.share}
+        </span>
+        <a
+          href={`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(post.title)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-4 py-2 rounded-lg border border-line text-[13px] font-semibold text-ink-muted hover:text-accent hover:border-accent/40 transition-colors"
+        >
+          Telegram
+        </a>
+        <a
+          href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(post.title)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-4 py-2 rounded-lg border border-line text-[13px] font-semibold text-ink-muted hover:text-accent hover:border-accent/40 transition-colors"
+        >
+          Twitter
+        </a>
+        <button
+          type="button"
+          onClick={copyLink}
+          className="px-4 py-2 rounded-lg border border-line text-[13px] font-semibold text-ink-muted hover:text-accent hover:border-accent/40 transition-colors"
+        >
+          {copied ? t.blog.copied : t.blog.copyLink}
+        </button>
+        {views > 0 && (
+          <span className="ml-auto text-[13px] font-medium text-ink-subtle">
+            {compactNumber(views)} {t.common.views}
+          </span>
+        )}
+      </div>
+
+      {/* Related */}
+      {related.length > 0 && (
+        <section className="mt-14">
+          <h2 className="text-[22px] font-extrabold text-ink tracking-tight mb-5">
+            {t.blog.related}
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {related.map((item, i) => (
+              <Link
+                key={item.id}
+                href={`/blog/${item.slug}`}
+                className="group bg-surface border border-line rounded-2xl shadow-card hover:shadow-card-hover transition-shadow p-6"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <span
+                    className="px-2.5 py-1 rounded-md text-[11px] font-bold text-white"
+                    style={{ backgroundColor: ACCENTS[i % ACCENTS.length] }}
+                  >
+                    {t.nav.blog}
+                  </span>
+                  <span className="text-[12px] font-medium text-ink-subtle">
+                    {formatDate(item.published_at)}
+                  </span>
+                </div>
+                <h3 className="text-[16px] font-extrabold text-ink tracking-tight leading-snug group-hover:text-accent transition-colors">
+                  {item.title}
+                </h3>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
   );
 }

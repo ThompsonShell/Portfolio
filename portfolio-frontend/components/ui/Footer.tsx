@@ -1,22 +1,47 @@
-import Link from "next/link";
+"use client";
+
+import { useEffect, useState } from "react";
+import { getAbout } from "@/lib/api";
+import { useLanguage } from "@/components/i18n/LanguageProvider";
+import type { About } from "@/lib/types";
 
 export default function Footer() {
+  const { t, locale } = useLanguage();
+  const [about, setAbout] = useState<About | null>(null);
+
+  useEffect(() => {
+    getAbout(locale)
+      .then(setAbout)
+      .catch(() => setAbout(null));
+  }, [locale]);
+
+  const socials = [
+    { label: "GitHub", href: about?.github_url },
+    { label: "Telegram", href: about?.telegram_url },
+    { label: "LinkedIn", href: about?.linkedin_url },
+  ].filter((s) => s.href);
+
   return (
-    <footer className="w-full bg-black border-t border-[#1a1a1a]">
-      <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-6">
-        <div className="text-[11px] font-bold text-[#8c8c94] tracking-wider lowercase">
-          thompsonshell
-        </div>
+    <footer className="w-full bg-canvas">
+      <div className="max-w-[1200px] mx-auto px-5 md:px-7">
+        <div className="border-t border-line py-7 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="text-[13px] font-medium text-ink-subtle">
+            &copy; {new Date().getFullYear()} {t.footer.rights}
+          </div>
 
-        <div className="flex flex-wrap justify-center gap-x-6 gap-y-3 text-xs font-bold text-[#8c8c94]">
-          <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">GitHub</a>
-          <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">LinkedIn</a>
-          <a href="https://telegram.org" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Telegram</a>
-          <a href="mailto:hello@thompson.dev" className="hover:text-white transition-colors">Email</a>
-        </div>
-
-        <div className="text-[10px] font-medium text-[#8c8c94]/50 uppercase tracking-wider">
-          &copy;{new Date().getFullYear()} &middot; Stack
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-[13px] font-medium text-ink-muted">
+            {socials.map((s) => (
+              <a
+                key={s.label}
+                href={s.href as string}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-accent transition-colors"
+              >
+                {s.label}
+              </a>
+            ))}
+          </div>
         </div>
       </div>
     </footer>

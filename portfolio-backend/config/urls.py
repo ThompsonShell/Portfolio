@@ -10,6 +10,10 @@ urlpatterns = [
     # JWT auth — Next.js POSTs credentials here to get a token for uploads.
     path("api/auth/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("api/", include("analytics.urls")),
+    path("api/", include("works.urls")),
+    path("api/", include("mentors.urls")),
+    # Deprecated: superseded by /api/works/. Kept so old clients keep working.
     path("api/", include("projects.urls")),
     path("api/", include("blog.urls")),
     path("api/", include("lectures.urls")),

@@ -1,9 +1,11 @@
 from django.contrib import admin
+from modeltranslation.admin import TranslationAdmin
+
 from .models import Bio, Experience, Skill
 
 
 @admin.register(Bio)
-class BioAdmin(admin.ModelAdmin):
+class BioAdmin(TranslationAdmin):
     list_display = ("__str__",)
 
     def has_add_permission(self, request):
@@ -12,12 +14,12 @@ class BioAdmin(admin.ModelAdmin):
 
 
 @admin.register(Experience)
-class ExperienceAdmin(admin.ModelAdmin):
+class ExperienceAdmin(TranslationAdmin):
     list_display = ("title", "company", "start_date", "end_date", "order")
     list_editable = ("order",)
 
 
 @admin.register(Skill)
-class SkillAdmin(admin.ModelAdmin):
+class SkillAdmin(TranslationAdmin):
     list_display = ("name", "order")
     list_editable = ("order",)

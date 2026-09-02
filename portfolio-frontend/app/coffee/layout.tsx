@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Coffee",
-  description: "Schedule a coffee chat to discuss technology, collaboration, or career advice.",
+  title: "Qahva",
+  description: "Bir piyola qahva ustida suhbat — online yoki Toshkentda.",
 };
 
 export default function CoffeeLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+  return children;
 }

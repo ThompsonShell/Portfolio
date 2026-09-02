@@ -9,6 +9,10 @@ class Post(models.Model):
     content = models.TextField(help_text="Markdown content")
     excerpt = models.CharField(max_length=500, blank=True, default="")
     reading_time = models.PositiveIntegerField(default=5, help_text="Estimated reading time in minutes")
+    views_count = models.PositiveIntegerField(
+        default=0, editable=False,
+        help_text="Avtomatik hisoblanadi — har bir tashrifchi bir marta",
+    )
     published_at = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

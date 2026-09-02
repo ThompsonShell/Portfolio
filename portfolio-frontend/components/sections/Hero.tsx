@@ -1,169 +1,111 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
-import Image from "next/image";
 import Link from "next/link";
-import { getAbout } from "@/lib/api";
-import type { About } from "@/lib/types";
+import { useEffect, useState } from "react";
+import { useLanguage } from "@/components/i18n/LanguageProvider";
 
-export default function Hero() {
-  const [about, setAbout] = useState<About | null>(null);
+/** The mission_control.sh panel on the right of the hero. Lines reveal one at a
+ *  time so the block reads like a session, not a screenshot. */
+const TERMINAL_LINES: { text: string; tone: string }[] = [
+  { text: "// mission_control.sh", tone: "text-white/25" },
+  { text: "$ satellite --status", tone: "text-emerald-300" },
+  { text: "● SAT-001 online", tone: "text-amber-300" },
+  { text: "└ orbit: 408km LEO", tone: "text-white/40" },
+  { text: "└ signal: ███████░░ 82%", tone: "text-white/40" },
+  { text: "└ uplink: 2.4 Gbps", tone: "text-white/40" },
+  { text: "", tone: "" },
+  { text: "$ deploy --target=production", tone: "text-emerald-300" },
+  { text: "✓ deployed successfully", tone: "text-emerald-400" },
+];
+
+function MissionControl() {
+  const [visible, setVisible] = useState(0);
 
   useEffect(() => {
-    getAbout().then(setAbout).catch(() => {});
-  }, []);
+    if (visible >= TERMINAL_LINES.length) return;
+    const id = window.setTimeout(() => setVisible((n) => n + 1), 260);
+    return () => window.clearTimeout(id);
+  }, [visible]);
 
-  const socialLinks = [
-    { label: "GitHub", href: about?.github_url || "#" },
-    { label: "LinkedIn", href: about?.linkedin_url || "#" },
-    { label: "Telegram", href: about?.telegram_url || "#" },
-    ...(about?.resume_url ? [{ label: "Resume ↓", href: about.resume_url }] : []),
-  ];
   return (
-    <section className="border-b border-[#1a1a1a]">
-      {/* ── MOBILE: centered layout (image 1 style) ── */}
-      <div className="md:hidden flex flex-col items-center text-center px-6 py-16">
-        <p className="text-[10px] font-black tracking-[0.2em] text-[#8c8c94] uppercase mb-10 flex items-center gap-3">
-          <span className="w-2 h-2 rounded-full bg-green-500 block" />
-          Software Engineer · Tashkent
-        </p>
-
-        <motion.h1
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-6xl font-bold tracking-tighter text-white leading-[0.9]"
-        >
-          Thompson
-          <br />
-          Shell
-        </motion.h1>
-
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.12 }}
-          transition={{ delay: 0.2 }}
-          className="text-5xl font-bold tracking-tighter italic text-white mt-2 leading-none select-none"
-        >
-          builds systems.
-        </motion.p>
-
-        <p className="text-sm font-medium leading-relaxed text-[#8c8c94] max-w-xs mt-10 mb-10">
-          Backend architectures that hold under pressure.
-          High-load APIs, distributed systems, and the infrastructure
-          that makes products not break at 3am.
-        </p>
-
-        <div className="flex items-center gap-4 mb-10">
-          <Link
-            href="/projects"
-            className="px-6 py-3 rounded-xl border border-white/20 text-xs font-bold text-white hover:bg-white/5 transition-colors"
-          >
-            View projects
-          </Link>
-          <Link
-            href="/blog"
-            className="px-6 py-3 rounded-xl border border-white/20 text-xs font-bold text-white hover:bg-white/5 transition-colors"
-          >
-            Read writing →
-          </Link>
-        </div>
-
-        <div className="flex flex-wrap justify-center gap-3">
-          {socialLinks.map((s) => (
-            <a
-              key={s.label}
-              href={s.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-5 py-2.5 rounded-full border border-[#1a1a1a] text-[11px] font-semibold text-[#8c8c94] hover:text-white hover:border-[#8c8c94] transition-colors"
-            >
-              {s.label}
-            </a>
-          ))}
-        </div>
+    <div className="rounded-2xl bg-[#16132e]/90 border border-white/10 shadow-lift overflow-hidden">
+      {/* Title bar */}
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10">
+        <span className="w-2.5 h-2.5 rounded-full bg-[#FF5F57]" />
+        <span className="w-2.5 h-2.5 rounded-full bg-[#FEBC2E]" />
+        <span className="w-2.5 h-2.5 rounded-full bg-[#28C840]" />
+        <span className="ml-2 font-mono text-[11px] text-white/40">
+          mission_control.sh
+        </span>
       </div>
 
-      {/* ── DESKTOP: two-column layout (image 4 style) ── */}
-      <div className="hidden md:grid grid-cols-2">
-        {/* Left Column */}
-        <div className="p-12 lg:p-16 flex flex-col justify-center border-r border-[#1a1a1a]">
-          <p className="text-[10px] font-black tracking-[0.2em] text-[#8c8c94] uppercase mb-12 flex items-center gap-3">
-            <span className="w-2 h-2 rounded-full bg-green-500 block" />
-            Software Engineer · Tashkent
-          </p>
-
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-7xl lg:text-8xl font-bold tracking-tighter text-white leading-[0.9] mb-1"
-          >
-            Thompson
-          </motion.h1>
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="text-7xl lg:text-8xl font-bold tracking-tighter text-white/15 italic leading-[0.9] mb-10"
-          >
-            Shell.
-          </motion.h1>
-
-          <p className="text-sm font-medium leading-relaxed text-[#8c8c94] max-w-sm mb-12">
-            Backend systems that hold under pressure — distributed architectures,
-            high-load APIs, and the infrastructure that makes products not break at 3am.
-          </p>
-
-          <div className="flex flex-wrap items-center gap-6">
-            <Link
-              href="/projects"
-              className="px-6 py-3 rounded-xl border border-amber-500 text-xs font-bold text-amber-500 hover:bg-amber-500/10 transition-colors"
-            >
-              View projects
-            </Link>
-            <Link
-              href="/blog"
-              className="text-xs font-bold text-white hover:text-white/80 transition-colors flex items-center gap-2"
-            >
-              Read my writing <span className="text-[14px]">→</span>
-            </Link>
+      <div className="p-5 font-mono text-[12px] leading-[1.9] min-h-[220px]">
+        {TERMINAL_LINES.slice(0, visible).map((line, i) => (
+          <div key={i} className={`${line.tone} animate-fade-up`}>
+            {line.text || " "}
           </div>
-        </div>
+        ))}
+        {visible >= TERMINAL_LINES.length && (
+          <span className="inline-block w-[7px] h-[14px] bg-emerald-400/80 align-middle animate-blink" />
+        )}
+      </div>
+    </div>
+  );
+}
 
-        {/* Right Column */}
-        <div className="p-12 lg:p-16 flex flex-col items-center justify-center">
-          {/* Circular photo */}
-          <div className="w-full max-w-[340px] aspect-square bg-black border border-[#1a1a1a] rounded-full relative flex items-center justify-center mb-10 overflow-hidden group">
-            {about?.photo_url ? (
-              <Image
-                src={about.photo_url}
-                alt="ThompsonShell"
-                fill
-                className="object-cover grayscale hover:grayscale-0 transition-all duration-700"
-              />
-            ) : (
-              <>
-                <div className="w-20 h-20 rounded-full bg-[#1a1a1a] z-10 transition-transform group-hover:scale-110 duration-500" />
-                <p className="absolute text-[10px] font-black text-[#8c8c94] uppercase tracking-[0.3em] leading-none">
-                  ThompsonShell
-                </p>
-              </>
-            )}
-          </div>
+export default function Hero() {
+  const { t } = useLanguage();
 
-          {/* Social Links */}
-          <div className="flex flex-wrap justify-center gap-3 max-w-[340px]">
-            {socialLinks.map((s) => (
-              <a
-                key={s.label}
-                href={s.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-5 py-2.5 rounded-full border border-[#1a1a1a] text-[11px] font-semibold text-[#8c8c94] hover:text-white hover:border-[#8c8c94] transition-colors"
+  return (
+    <section className="px-5 md:px-7 pt-6">
+      <div className="max-w-[1330px] mx-auto rounded-[28px] overflow-hidden relative bg-gradient-to-br from-night via-[#3B1E86] to-accent">
+        {/* Soft glow so the flat gradient gets some depth */}
+        <div
+          aria-hidden
+          className="absolute -top-24 -right-16 w-[420px] h-[420px] rounded-full bg-white/10 blur-3xl pointer-events-none"
+        />
+
+        <div className="relative grid lg:grid-cols-2 gap-10 lg:gap-14 items-center px-7 md:px-14 py-14 md:py-16">
+          {/* Left */}
+          <div>
+            <p className="flex items-center gap-2.5 text-[13px] font-medium text-white/75 mb-7">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_10px_2px_rgba(52,211,153,0.6)]" />
+              {t.home.available}
+            </p>
+
+            <h1 className="text-[52px] md:text-[68px] font-extrabold text-white leading-[0.95] tracking-tight">
+              Asilbek
+              <br />
+              <span className="text-[#C4B5FD]">Rajabov.</span>
+            </h1>
+
+            <p className="mt-6 text-[17px] leading-relaxed text-white/75 max-w-md">
+              {t.home.role}
+            </p>
+
+            <p className="mt-4 text-[14px] italic text-white/45 max-w-md">
+              {t.home.quote}
+            </p>
+
+            <div className="mt-9 flex flex-wrap items-center gap-3">
+              <Link
+                href="/works"
+                className="px-6 py-3.5 rounded-xl bg-accent text-white text-[14px] font-semibold shadow-lg shadow-accent/25 hover:bg-[#6D28D9] transition-colors"
               >
-                {s.label}
-              </a>
-            ))}
+                {t.home.ctaWorks}
+              </Link>
+              <Link
+                href="/lectures"
+                className="px-6 py-3.5 rounded-xl border border-white/25 text-white text-[14px] font-semibold hover:bg-white/10 transition-colors"
+              >
+                {t.home.ctaLectures} →
+              </Link>
+            </div>
+          </div>
+
+          {/* Right */}
+          <div className="hidden lg:block">
+            <MissionControl />
           </div>
         </div>
       </div>

@@ -1,50 +1,83 @@
-@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap");
-
-@font-face {
-  font-family: 'Google Sans';
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url('https://fonts.gstatic.com/s/googlesans/v45/4UaGrENHsxJlGDuGo1OIlL3Owp4.woff2') format('woff2');
-}
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap");
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
 html {
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background-color: #000000;
-  color: #a3a3a3; /* lght text for body */
+  background-color: #f5f5f4;
+  color: #0a0a0a;
   min-height: 100vh;
-  font-family: 'Google Sans', sans-serif;
-  font-weight: 500;
+  font-family: var(--font-sans);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Scrollbar styling */
+/* Headings carry the tight, heavy look of the design. */
+h1,
+h2,
+h3 {
+  letter-spacing: -0.03em;
+}
+
+::selection {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+/* Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 10px;
+  height: 10px;
 }
-
 ::-webkit-scrollbar-track {
-  background: #000000;
+  background: #f5f5f4;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: #111827;
-  border-radius: 4px;
+  background: #d6d3d1;
+  border-radius: 5px;
+  border: 2px solid #f5f5f4;
 }
-
 ::-webkit-scrollbar-thumb:hover {
-  background: #f59e0b;
+  background: #7c3aed;
 }
 
-/* Syntax highlighting overrides for dark theme */
-.hljs {
-  background: #111827 !important;
+/* Code blocks inside articles sit on white cards, so the highlight theme
+   must be light too — the dark github theme is loaded only for terminals. */
+.prose-body .hljs {
+  background: #ffffff !important;
+  border: 1px solid #e7e5e4;
   border-radius: 1rem;
   padding: 1.25rem !important;
+  font-size: 0.8125rem;
+  line-height: 1.7;
+}
+
+/* Terminal / mission-control panels keep the dark syntax look. */
+.terminal-surface {
+  background: #16132e;
+  color: #c4b5fd;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

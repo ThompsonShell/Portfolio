@@ -19,6 +19,9 @@ CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 INSTALLED_APPS = [
+    # modeltranslation must come before django.contrib.admin so its admin
+    # patches (the per-language field tabs) actually apply.
+    "modeltranslation",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -32,6 +35,9 @@ INSTALLED_APPS = [
     "cloudinary",
     "cloudinary_storage",
     # Local apps
+    "works",
+    "mentors",
+    "analytics",
     "projects",
     "blog",
     "lectures",
@@ -44,6 +50,8 @@ MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
+    "config.middleware.QueryParamLocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -89,10 +97,25 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-LANGUAGE_CODE = "en-us"
-TIME_ZONE = "UTC"
+# ── i18n ─────────────────────────────────────────────────────────────────────
+# The site ships in Uzbek and English. Uzbek is the default: content is authored
+# in it first, and modeltranslation falls back to it when a translation is blank.
+LANGUAGE_CODE = "uz"
+TIME_ZONE = "Asia/Tashkent"
 USE_I18N = True
+USE_L10N = True
 USE_TZ = True
+
+LANGUAGES = [
+    ("uz", "O'zbekcha"),
+    ("en", "English"),
+]
+
+LOCALE_PATHS = [BASE_DIR / "locale"]
+
+MODELTRANSLATION_DEFAULT_LANGUAGE = "uz"
+MODELTRANSLATION_LANGUAGES = ("uz", "en")
+MODELTRANSLATION_FALLBACK_LANGUAGES = ("uz", "en")
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
